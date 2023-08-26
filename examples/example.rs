@@ -35,6 +35,7 @@ fn main() {
         dbus_name: "my_player",
         display_name: "My Player",
         hwnd,
+        podcast_controls: true
     };
 
     let mut controls = MediaControls::new(config).unwrap();

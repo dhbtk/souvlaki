@@ -35,6 +35,8 @@ pub enum MediaControlEvent {
     Next,
     Previous,
     Stop,
+    SkipBackward(Duration),
+    SkipForward(Duration),
 
     /// Seek forward or backward by an undetermined amount.
     Seek(SeekDirection),

@@ -9,4 +9,5 @@ pub struct PlatformConfig<'a> {
     pub dbus_name: &'a str,
     /// An HWND. (*Required on Windows*)
     pub hwnd: Option<*mut c_void>,
+    pub podcast_controls: bool
 }

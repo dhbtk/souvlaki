@@ -12,7 +12,7 @@ use std::{
 use block::ConcreteBlock;
 use cocoa::{
     base::{id, nil, NO, YES},
-    foundation::{NSInteger, NSSize, NSString, NSUInteger},
+    foundation::{NSInteger, NSSize, NSString, NSUInteger, NSArray},
 };
 use core_graphics::geometry::CGSize;
 use dispatch::{Queue, QueuePriority};
@@ -25,12 +25,16 @@ use crate::{MediaControlEvent, MediaMetadata, MediaPlayback, PlatformConfig, Med
 pub struct Error;
 
 /// A handle to OS media controls.
-pub struct MediaControls;
+pub struct MediaControls {
+    podcast_controls: bool
+}
 
 impl MediaControls {
     /// Create media controls with the specified config.
-    pub fn new(_config: PlatformConfig) -> Result<Self, Error> {
-        Ok(Self)
+    pub fn new(config: PlatformConfig) -> Result<Self, Error> {
+        Ok(Self {
+            podcast_controls: config.podcast_controls
+        })
     }
 
     /// Attach the media control events to a handler.
@@ -38,7 +42,7 @@ impl MediaControls {
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
-        unsafe { attach_command_handlers(Arc::new(event_handler)) };
+        unsafe { attach_command_handlers(Arc::new(event_handler), self.podcast_controls) };
         Ok(())
     }
 
@@ -156,7 +160,7 @@ unsafe fn set_playback_progress(progress: Duration) {
     let _: () = msg_send!(media_center, setNowPlayingInfo: now_playing);
 }
 
-unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
+unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>, podcast_controls: bool) {
     let command_center: id = msg_send!(class!(MPRemoteCommandCenter), sharedCommandCenter);
 
     // togglePlayPauseCommand
@@ -198,32 +202,69 @@ unsafe fn attach_command_handlers(handler: Arc<dyn Fn(MediaControlEvent)>) {
     let _: () = msg_send!(cmd, setEnabled: YES);
     let _: () = msg_send!(cmd, addTargetWithHandler: pause_handler);
 
-    // previousTrackCommand
-    let previous_track_handler = ConcreteBlock::new({
-        let handler = handler.clone();
-        move |_event: id| -> NSInteger {
-            (handler)(MediaControlEvent::Previous);
-            MPRemoteCommandHandlerStatusSuccess
-        }
-    })
-    .copy();
-    let cmd: id = msg_send!(command_center, previousTrackCommand);
-    let _: () = msg_send!(cmd, setEnabled: YES);
-    let _: () = msg_send!(cmd, addTargetWithHandler: previous_track_handler);
+    if podcast_controls {
+        let backwards_seconds: i32 = 15;
+        let forwards_seconds: i32 = 30;
+        let skip_backwards_amount = Duration::from_secs(backwards_seconds.unsigned_abs() as u64);
+        let skip_forwards_amount = Duration::from_secs(forwards_seconds.unsigned_abs() as u64);
+        // skipBackwardCommand
+        let skip_backward_handler = ConcreteBlock::new({
+            let handler = handler.clone();
+            move |_event: id| -> NSInteger {
+                (handler)(MediaControlEvent::SkipBackward(skip_backwards_amount));
+                MPRemoteCommandHandlerStatusSuccess
+            }
+        })
+            .copy();
+        let cmd: id = msg_send!(command_center, skipBackwardCommand);
+        let backwards_interval_amount: id = msg_send!(class!(NSNumber), numberWithInt: backwards_seconds);
+        let backward_interval_array: id = msg_send!(class!(NSArray), arrayWithObject: backwards_interval_amount);
+        let _: () = msg_send!(cmd, setPreferredIntervals: backward_interval_array);
+        let _: () = msg_send!(cmd, setEnabled: YES);
+        let _: () = msg_send!(cmd, addTargetWithHandler: skip_backward_handler);
 
-    // nextTrackCommand
-    let next_track_handler = ConcreteBlock::new({
-        let handler = handler.clone();
-        move |_event: id| -> NSInteger {
-            (handler)(MediaControlEvent::Next);
-            MPRemoteCommandHandlerStatusSuccess
-        }
-    })
-    .copy();
-    let cmd: id = msg_send!(command_center, nextTrackCommand);
-    let _: () = msg_send!(cmd, setEnabled: YES);
-    let _: () = msg_send!(cmd, addTargetWithHandler: next_track_handler);
+        // skipForwardCommand
+        let skip_forward_handler = ConcreteBlock::new({
+            let handler = handler.clone();
+            move |_event: id| -> NSInteger {
+                (handler)(MediaControlEvent::SkipForward(skip_forwards_amount));
+                MPRemoteCommandHandlerStatusSuccess
+            }
+        })
+            .copy();
+        let cmd: id = msg_send!(command_center, skipForwardCommand);
+        let forwards_interval_amount: id = msg_send!(class!(NSNumber), numberWithInt: forwards_seconds);
+        let forwards_interval_array: id = NSArray::arrayWithObject(nil, forwards_interval_amount);
+        let _: () = msg_send!(cmd, setPreferredIntervals: forwards_interval_array);
+        let _: () = msg_send!(cmd, setEnabled: YES);
+        let _: () = msg_send!(cmd, addTargetWithHandler: skip_forward_handler);
+    } else {
+        // previousTrackCommand
+        let previous_track_handler = ConcreteBlock::new({
+            let handler = handler.clone();
+            move |_event: id| -> NSInteger {
+                (handler)(MediaControlEvent::Previous);
+                MPRemoteCommandHandlerStatusSuccess
+            }
+        })
+            .copy();
+        let cmd: id = msg_send!(command_center, previousTrackCommand);
+        let _: () = msg_send!(cmd, setEnabled: YES);
+        let _: () = msg_send!(cmd, addTargetWithHandler: previous_track_handler);
 
+        // nextTrackCommand
+        let next_track_handler = ConcreteBlock::new({
+            let handler = handler.clone();
+            move |_event: id| -> NSInteger {
+                (handler)(MediaControlEvent::Next);
+                MPRemoteCommandHandlerStatusSuccess
+            }
+        })
+            .copy();
+        let cmd: id = msg_send!(command_center, nextTrackCommand);
+        let _: () = msg_send!(cmd, setEnabled: YES);
+        let _: () = msg_send!(cmd, addTargetWithHandler: next_track_handler);
+    }
     // changePlaybackPositionCommand
     let position_handler = ConcreteBlock::new({
         let handler = handler.clone();
