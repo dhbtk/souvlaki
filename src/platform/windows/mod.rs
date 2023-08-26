@@ -19,6 +19,7 @@ pub struct MediaControls {
     button_handler_token: Option<EventRegistrationToken>,
     display_updater: SystemMediaTransportControlsDisplayUpdater,
     timeline_properties: SystemMediaTransportControlsTimelineProperties,
+    podcast_controls: bool
 }
 
 #[repr(i32)]
@@ -60,6 +61,7 @@ impl MediaControls {
             display_updater,
             timeline_properties,
             button_handler_token: None,
+            podcast_controls: config.podcast_controls
         })
     }
 
@@ -68,6 +70,10 @@ impl MediaControls {
     where
         F: Fn(MediaControlEvent) + Send + 'static,
     {
+        let backwards_seconds: i32 = 15;
+        let forwards_seconds: i32 = 30;
+        let skip_backwards_amount = Duration::from_secs(backwards_seconds.unsigned_abs() as u64);
+        let skip_forwards_amount = Duration::from_secs(forwards_seconds.unsigned_abs() as u64);
         self.controls.SetIsEnabled(true)?;
         self.controls.SetIsPlayEnabled(true)?;
         self.controls.SetIsPauseEnabled(true)?;
@@ -97,9 +103,17 @@ impl MediaControls {
                 } else if button == SystemMediaTransportControlsButton::Stop {
                     MediaControlEvent::Stop
                 } else if button == SystemMediaTransportControlsButton::Next {
-                    MediaControlEvent::Next
+                    if self.podcast_controls {
+                        MediaControlEvent::SkipForward(skip_forwards_amount)
+                    } else {
+                        MediaControlEvent::Next
+                    }
                 } else if button == SystemMediaTransportControlsButton::Previous {
-                    MediaControlEvent::Previous
+                    if self.podcast_controls {
+                        MediaControlEvent::SkipBackward(skip_backwards_amount)
+                    } else {
+                        MediaControlEvent::Previous
+                    }
                 } else if button == SystemMediaTransportControlsButton::FastForward {
                     MediaControlEvent::Seek(SeekDirection::Forward)
                 } else if button == SystemMediaTransportControlsButton::Rewind {
