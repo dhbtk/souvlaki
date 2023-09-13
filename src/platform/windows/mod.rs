@@ -87,7 +87,7 @@ impl MediaControls {
         self.display_updater.SetType(MediaPlaybackType::Music)?;
 
         let event_handler = Arc::new(Mutex::new(event_handler));
-
+        let is_podcast_controls = self.podcast_controls;
         let button_handler = TypedEventHandler::new({
             let event_handler = event_handler.clone();
 
@@ -103,13 +103,13 @@ impl MediaControls {
                 } else if button == SystemMediaTransportControlsButton::Stop {
                     MediaControlEvent::Stop
                 } else if button == SystemMediaTransportControlsButton::Next {
-                    if self.podcast_controls {
+                    if is_podcast_controls {
                         MediaControlEvent::SkipForward(skip_forwards_amount)
                     } else {
                         MediaControlEvent::Next
                     }
                 } else if button == SystemMediaTransportControlsButton::Previous {
-                    if self.podcast_controls {
+                    if is_podcast_controls {
                         MediaControlEvent::SkipBackward(skip_backwards_amount)
                     } else {
                         MediaControlEvent::Previous
