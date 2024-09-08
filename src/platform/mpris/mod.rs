@@ -1,4 +1,4 @@
-#![cfg(all(unix, not(target_os = "macos"), not(target_os = "ios")))]
+#![cfg(all(unix, not(target_os = "macos")))]
 
 #[cfg(not(any(feature = "dbus", feature = "zbus")))]
 compile_error!("either feature \"dbus\" or feature \"zbus\" are required");

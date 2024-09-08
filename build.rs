@@ -1,4 +1,4 @@
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(target_os = "macos")]
 fn build_macos() {
     if std::env::var("TARGET").unwrap().contains("-apple") {
         println!("cargo:rustc-link-lib=framework=MediaPlayer");
@@ -6,6 +6,6 @@ fn build_macos() {
 }
 
 fn main() {
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[cfg(target_os = "macos")]
     build_macos();
 }
