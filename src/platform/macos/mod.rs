@@ -1,4 +1,4 @@
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", target_os = "ios"))]
 #![allow(non_upper_case_globals)]
 
 use std::{
